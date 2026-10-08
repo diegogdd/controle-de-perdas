@@ -33,7 +33,7 @@ table{border-collapse:collapse;width:100%}th,td{padding:8px;border-bottom:1px so
 .big.p1{background:#f59e0b}.big.p2{background:#0891b2}.big.p3{background:#4f46e5}.big.padmin{background:#374151}.big.sel{border-color:#000;box-shadow:0 0 0 3px #fff inset}
 .login{max-width:440px;margin:0 auto;padding:20px;text-align:center}.logo{font-size:24px;font-weight:800;color:var(--rd);margin-top:20px}
 .login input{width:100%;font-size:22px;text-align:center;margin-bottom:10px}
-.pwr{display:flex;gap:8px;margin-bottom:10px}.pwr input{margin:0;flex:1;letter-spacing:3px;color:#000;-webkit-text-fill-color:#000;background:#fff}.pwr button{width:58px;font-size:22px;background:#e5e7eb}
+.pwr{display:flex;gap:8px;margin-bottom:10px}.pwr input{margin:0;flex:1;letter-spacing:3px;color:#000;-webkit-text-fill-color:#000;background:#fff}.pwr input::placeholder{color:#9ca3af;-webkit-text-fill-color:#9ca3af;letter-spacing:0}.pwr button{width:58px;font-size:22px;background:#e5e7eb}
 .flt{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:10px}.flt label{display:flex;flex-direction:column;font-size:12px;color:var(--m)}
 .row{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--b)}
 .sm{padding:8px 10px;font-size:14px}.del{background:var(--r);color:#fff}.xl{background:var(--g);color:#fff}.hide{display:none}
@@ -61,7 +61,7 @@ function login(){$('#app').innerHTML=`<div class="login"><div class="logo">🗑�
 <div id="pw" class="hide"><p id="qual" style="font-weight:700;margin:0 0 8px"></p><div class="pwr"><input id="sn" type="password" autocomplete="off" placeholder="Digite a senha"><button id="eye" type="button">👁</button></div><button class="act" id="ent">ENTRAR</button></div></div>`;
  $$('[data-p]').forEach(b=>b.onclick=()=>{pick=b.dataset.p;$$('[data-p]').forEach(x=>x.classList.toggle('sel',x===b));$('#pw').classList.remove('hide');$('#qual').textContent=ICO[pick]+' '+NOME[pick];$('#sn').focus()});
  $('#eye').onclick=()=>{const i=$('#sn');i.type=i.type==='password'?'text':'password';i.focus()};
- $('#ent').onclick=entrar;$('#sn').onkeydown=e=>e.key==='Enter'&&entrar()}
+ $('#ent').onclick=entrar;$('#sn').onkeydown=e=>{if(e.key==='Enter')entrar()}}
 async function entrar(){const s=$('#sn').value;try{if(!await rpc('login',{p_perfil:pick,p_senha:s}))return toast('Senha incorreta',1);S={perfil:pick,senha:s};sessionStorage.setItem('s',JSON.stringify(S));boot()}catch(e){toast(e.message,1)}}
 async function boot(){try{S.perfil==='admin'?await carregarAd():await carregarOp()}catch(e){toast(e.message,1);login()}}
 // ---------- OPERADOR (1º/2º/3º) ----------
