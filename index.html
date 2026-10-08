@@ -1,0 +1,123 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Controle de Perdas</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// >>> PREENCHA AQUI com os dados do Supabase (Project Settings > API) <<<
+const SUPABASE_URL = "https://SEU-PROJETO.supabase.co";
+const SUPABASE_ANON_KEY = "SUA-ANON-KEY";
+</script>
+<style>
+:root{--bg:#f4f4f6;--c:#fff;--t:#1f2933;--m:#6b7280;--b:#e0e3e8;--r:#dc2626;--rd:#991b1b;--g:#16a34a;--bl:#1d4ed8}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:16px/1.4 system-ui,-apple-system,Segoe UI,sans-serif}
+button,input,select{font:inherit;color:var(--t)}
+button{border:0;border-radius:12px;padding:12px 14px;cursor:pointer;font-weight:700;background:#e5e7eb}button:active{transform:scale(.97)}
+input,select{background:#fff;border:2px solid var(--b);border-radius:10px;padding:10px;min-width:0}
+.top{background:var(--r);color:#fff;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:5px solid var(--rd)}
+.top b{font-size:18px}.top button{background:#fff2;color:#fff;padding:8px 12px}
+main{max-width:900px;margin:0 auto;padding:12px}
+.tabs{display:flex;gap:8px;margin-bottom:12px}.tabs button{flex:1;padding:14px 6px;font-size:16px;background:#fff;border:2px solid var(--b)}
+.tabs button.on{background:var(--rd);color:#fff;border-color:var(--rd)}
+.card{background:var(--c);border:1px solid var(--b);border-left:6px solid var(--r);border-radius:12px;padding:12px;margin-bottom:12px}
+.card h2{margin:0 0 8px;font-size:15px;color:var(--rd);text-transform:uppercase;letter-spacing:.4px}
+.m{color:var(--m);font-size:13px}.sc{overflow-x:auto}
+table{border-collapse:collapse;width:100%}th,td{padding:8px;border-bottom:1px solid var(--b);text-align:right;white-space:nowrap}th{color:var(--rd);font-size:13px}th:first-child,td:first-child,.l{text-align:left}
+.chip{display:inline-block;padding:3px 10px;border-radius:999px;color:#fff;font-weight:700}.chip.red{background:var(--r)}.chip.grn{background:var(--g)}.chip.nil{background:#cbd5e1;color:#475569}
+.stat{border-radius:14px;padding:14px;color:#fff;margin-bottom:12px}.stat.red{background:var(--r)}.stat.grn{background:var(--g)}
+.stat b{font-size:34px;display:block;line-height:1.1}.bar{height:12px;background:#fff5;border-radius:6px;margin-top:8px;overflow:hidden}.bar i{display:block;height:100%;background:#fff}
+.tile{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;border:2px solid var(--b);border-radius:12px;margin-bottom:8px;background:#fff}
+.tile.has{border-color:var(--r);background:#fef2f2}.tile span{font-weight:700;flex:1}
+.st{display:flex;align-items:center;gap:6px}.st button{width:46px;height:46px;font-size:24px;padding:0;background:var(--r);color:#fff}.st button.mn{background:#9ca3af}
+.st input{width:80px;text-align:center;font-size:20px;font-weight:700}
+.send{position:sticky;bottom:0;padding:10px 0;background:linear-gradient(transparent,var(--bg) 25%)}
+.act{background:var(--bl);color:#fff;width:100%;padding:18px;font-size:19px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}.big{padding:26px 8px;font-size:19px;color:#fff;border:4px solid transparent}
+.big.p1{background:#f59e0b}.big.p2{background:#0891b2}.big.p3{background:#4f46e5}.big.padmin{background:#374151}.big.sel{border-color:#000;box-shadow:0 0 0 3px #fff inset}
+.login{max-width:440px;margin:0 auto;padding:20px;text-align:center}.logo{font-size:24px;font-weight:800;color:var(--rd);margin-top:20px}
+.login input{width:100%;font-size:22px;text-align:center;margin-bottom:10px}
+.pwr{display:flex;gap:8px;margin-bottom:10px}.pwr input{margin:0;flex:1;letter-spacing:3px;color:#000;-webkit-text-fill-color:#000;background:#fff}.pwr button{width:58px;font-size:22px;background:#e5e7eb}
+.flt{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:10px}.flt label{display:flex;flex-direction:column;font-size:12px;color:var(--m)}
+.row{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--b)}
+.sm{padding:8px 10px;font-size:14px}.del{background:var(--r);color:#fff}.xl{background:var(--g);color:#fff}.hide{display:none}
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#111;color:#fff;padding:12px 18px;border-radius:12px;display:none;z-index:9}#toast.err{background:var(--r)}
+</style></head><body><div id="app"></div><div id="toast"></div>
+<script>
+const LIM=25; // limite em kg por turno/dia (acima = vermelho, até 25 = verde)
+const $=(s)=>document.querySelector(s),$$=(s)=>document.querySelectorAll(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=n=>Number(n).toLocaleString('pt-BR',{maximumFractionDigits:2})+' kg';
+const br=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
+const add=(s,n)=>{const d=new Date(s+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
+const sum=a=>a.reduce((x,r)=>x+Number(r.kg),0),cls=k=>k>LIM?'red':'grn';
+const NOME={'1':'1º Turno','2':'2º Turno','3':'3º Turno',admin:'Administrador'},ICO={'1':'☀️','2':'🌤️','3':'🌙',admin:'🔒'};
+let S=null,mot=[],rows=[],dia='',view='lan',qt={},F={},pick=null,aview='rel';
+function toast(t,e){const x=$('#toast');x.textContent=t;x.className=e?'err':'';x.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>x.style.display='none',2800)}
+async function rpc(fn,a){const r=await fetch(SUPABASE_URL+'/rest/v1/rpc/'+fn,{method:'POST',headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:JSON.stringify(a)});
+ const j=await r.json().catch(()=>null);if(!r.ok)throw new Error((j&&j.message)||'Erro de conexão');return j}
+const A=()=>({p_perfil:S.perfil,p_senha:S.senha}),AD=()=>({p_senha:S.senha});
+const chip=(k)=>k?`<span class="chip ${cls(k)}">${fmt(k)}</span>`:'<span class="chip nil">–</span>';
+function shell(t,body){$('#app').innerHTML=`<div class="top"><b>${t}</b><button id="sair">Sair</button></div><main>${body}</main>`;$('#sair').onclick=()=>{sessionStorage.removeItem('s');S=null;qt={};login()}}
+// ---------- LOGIN ----------
+function login(){$('#app').innerHTML=`<div class="login"><div class="logo">🗑️ CONTROLE DE PERDAS</div><p class="m">Toque no seu acesso</p>
+<div class="grid">${['1','2','3','admin'].map(p=>`<button class="big p${p}" data-p="${p}">${ICO[p]}<br>${NOME[p]}</button>`).join('')}</div>
+<div id="pw" class="hide"><p id="qual" style="font-weight:700;margin:0 0 8px"></p><div class="pwr"><input id="sn" type="password" autocomplete="off" placeholder="Digite a senha"><button id="eye" type="button">👁</button></div><button class="act" id="ent">ENTRAR</button></div></div>`;
+ $$('[data-p]').forEach(b=>b.onclick=()=>{pick=b.dataset.p;$$('[data-p]').forEach(x=>x.classList.toggle('sel',x===b));$('#pw').classList.remove('hide');$('#qual').textContent=ICO[pick]+' '+NOME[pick];$('#sn').focus()});
+ $('#eye').onclick=()=>{const i=$('#sn');i.type=i.type==='password'?'text':'password';i.focus()};
+ $('#ent').onclick=entrar;$('#sn').onkeydown=e=>e.key==='Enter'&&entrar()}
+async function entrar(){const s=$('#sn').value;try{if(!await rpc('login',{p_perfil:pick,p_senha:s}))return toast('Senha incorreta',1);S={perfil:pick,senha:s};sessionStorage.setItem('s',JSON.stringify(S));boot()}catch(e){toast(e.message,1)}}
+async function boot(){try{S.perfil==='admin'?await carregarAd():await carregarOp()}catch(e){toast(e.message,1);login()}}
+// ---------- OPERADOR (1º/2º/3º) ----------
+async function carregarOp(){dia=await rpc('dia_ref',{p_turno:+S.perfil});rows=await rpc('historico',{...A(),p_de:add(dia,-62),p_ate:dia});mot=await rpc('listar_motivos',A());opV()}
+function opV(){const hoje=sum(rows.filter(r=>r.dia===dia)),mes=rows.filter(r=>r.dia.slice(0,7)===dia.slice(0,7));
+ const tabs=`<div class="tabs"><button data-v="lan" class="${view==='lan'?'on':''}">➕ LANÇAR PERDAS</button><button data-v="his" class="${view==='his'?'on':''}">📊 HISTÓRICO</button></div>`;
+ let b=tabs+`<div class="stat ${cls(hoje)}"><span>${hoje>LIM?'⚠️ ACIMA DO LIMITE':'✅ DENTRO DO LIMITE'} · total do dia ${br(dia)}</span><b>${fmt(hoje)}</b><span>limite ${LIM} kg</span><div class="bar"><i style="width:${Math.min(100,hoje/LIM*100)}%"></i></div></div>`;
+ if(view==='lan'){const tot=Object.values(qt).reduce((x,v)=>x+(+v||0),0);
+  b+=`<div class="card"><h2>Responsável pelo descarte</h2><input id="resp" style="width:100%" placeholder="Nome de quem está descartando" value="${esc(localStorage.getItem('resp')||'')}"></div><div class="card"><h2>Motivos · informe os kg</h2>`+
+  (mot.map(m=>`<div class="tile ${+qt[m.id]>0?'has':''}"><span>${esc(m.nome)}</span><div class="st"><button class="mn" data-s="-" data-id="${m.id}">−</button><input type="number" min="0" step="any" inputmode="decimal" data-id="${m.id}" value="${qt[m.id]||''}" placeholder="0"><button data-s="+" data-id="${m.id}">+</button></div></div>`).join('')||'<p class="m">Nenhum motivo cadastrado. Peça ao admin.</p>')+
+  `</div><div class="send"><button class="act" id="env">ENVIAR PERDAS${tot?' · '+fmt(tot):''}</button></div>`}
+ else b+=`<div class="card"><h2>Acumulado do mês</h2><b style="font-size:26px">${fmt(sum(mes))}</b></div><div class="card"><h2>Dias anteriores (${NOME[S.perfil]})</h2><div class="sc">${tDia(rows,'op')}</div></div><div class="card"><h2>Mês por motivo</h2><div class="sc">${tMot(mes)}</div></div>`;
+ shell(`${ICO[S.perfil]} ${NOME[S.perfil].toUpperCase()}`,b);
+ $$('[data-v]').forEach(x=>x.onclick=()=>{view=x.dataset.v;opV()});
+ $$('.st input').forEach(i=>i.oninput=()=>{qt[i.dataset.id]=i.value;i.closest('.tile').classList.toggle('has',+i.value>0);const t=Object.values(qt).reduce((x,v)=>x+(+v||0),0);$('#env').textContent='ENVIAR PERDAS'+(t?' · '+fmt(t):'')});
+ $$('.st button').forEach(x=>x.onclick=()=>{const v=Math.max(0,(+qt[x.dataset.id]||0)+(x.dataset.s==='+'?.5:-.5));qt[x.dataset.id]=v||'';opV()});
+ if($('#env'))$('#env').onclick=enviar}
+async function enviar(){const resp=$('#resp').value.trim(),it=Object.entries(qt).filter(([k,v])=>+v>0).map(([k,v])=>({motivo_id:k,kg:+v}));
+ if(!resp)return toast('Informe o responsável',1);if(!it.length)return toast('Informe os kg de pelo menos um motivo',1);
+ try{localStorage.setItem('resp',resp)}catch(e){}
+ try{await rpc('lancar_perdas',{...A(),p_responsavel:resp,p_itens:it});qt={};toast('✅ Perdas enviadas!');await carregarOp()}catch(e){toast(e.message,1)}}
+// tabelas
+function tDia(r,modo){const g={};r.forEach(x=>{(g[x.dia]=g[x.dia]||[0,0,0])[x.turno-1]+=+x.kg});const ks=Object.keys(g).sort().reverse();if(!ks.length)return'<p class="m">Sem lançamentos.</p>';
+ if(modo==='op'){const i=+S.perfil-1;return'<table><tr><th>Dia</th><th>Total</th></tr>'+ks.map(d=>`<tr><td>${br(d)}</td><td>${chip(g[d][i])}</td></tr>`).join('')+'</table>'}
+ return'<table><tr><th>Dia</th><th>1º</th><th>2º</th><th>3º</th></tr>'+ks.map(d=>`<tr><td>${br(d)}</td><td>${chip(g[d][0])}</td><td>${chip(g[d][1])}</td><td>${chip(g[d][2])}</td></tr>`).join('')+'</table>'}
+function tMot(r){const g={};r.forEach(x=>g[x.motivo]=(g[x.motivo]||0)+ +x.kg);const k=Object.keys(g).sort((a,b)=>g[b]-g[a]);return k.length?'<table>'+k.map(m=>`<tr><td>${esc(m)}</td><td><b>${fmt(g[m])}</b></td></tr>`).join('')+'</table>':'<p class="m">Sem lançamentos.</p>'}
+// ---------- ADMIN ----------
+async function carregarAd(){dia=await rpc('dia_ref',{p_turno:1});F.de=F.de||dia.slice(0,8)+'01';F.ate=F.ate||dia;F.t=F.t||'';F.m=F.m||'';mot=await rpc('listar_motivos',A());await buscar()}
+async function buscar(){rows=await rpc('historico',{...A(),p_de:F.de,p_ate:F.ate});adV()}
+const fil=()=>rows.filter(r=>(!F.t||r.turno==F.t)&&(!F.m||r.motivo===F.m));
+function adV(){const r=fil(),tabs=`<div class="tabs">${[['rel','📋 RELATÓRIO'],['mot','🏷️ MOTIVOS'],['sen','🔑 SENHAS']].map(([k,n])=>`<button data-v="${k}" class="${aview===k?'on':''}">${n}</button>`).join('')}</div>`;let b=tabs;
+ if(aview==='rel')b+=`<div class="card"><h2>Filtros</h2><div class="flt"><label>De<input type="date" id="fd" value="${F.de}"></label><label>Até<input type="date" id="fa" value="${F.ate}"></label>
+ <label>Turno<select id="ft"><option value="">Todos</option>${[1,2,3].map(t=>`<option ${F.t==t?'selected':''}>${t}</option>`).join('')}</select></label>
+ <label>Motivo<select id="fm"><option value="">Todos</option>${[...new Set(mot.map(m=>m.nome).concat(rows.map(x=>x.motivo)))].sort().map(n=>`<option ${F.m===n?'selected':''}>${esc(n)}</option>`).join('')}</select></label><button class="xl" id="xl">⬇️ BAIXAR EXCEL</button></div></div>
+ <div class="card"><h2>Total do período: ${fmt(sum(r))}</h2><p class="m">Vermelho = acima de ${LIM} kg no dia/turno · Verde = até ${LIM} kg</p><div class="sc">${tDia(r,'ad')}</div></div>
+ <div class="card"><h2>Por motivo</h2><div class="sc">${tMot(r)}</div></div>
+ <div class="card"><h2>Lançamentos</h2><div class="sc">${r.length?'<table><tr><th>Dia</th><th>Turno</th><th class="l">Motivo</th><th>Kg</th><th class="l">Responsável</th><th></th></tr>'+r.slice(0,300).map(x=>`<tr><td>${br(x.dia)}</td><td>${x.turno}º</td><td class="l">${esc(x.motivo)}</td><td>${fmt(x.kg)}</td><td class="l">${esc(x.responsavel)}</td><td><button class="sm del" data-del="${x.id}">✕</button></td></tr>`).join('')+'</table>':'<p class="m">Sem lançamentos.</p>'}</div></div>`;
+ else if(aview==='mot')b+=`<div class="card"><h2>Novo motivo</h2><div class="flt"><input id="nm" placeholder="Ex.: Massa caiu no chão" style="flex:1"><button class="act" id="am" style="width:auto">ADICIONAR</button></div></div><div class="card"><h2>Motivos cadastrados</h2>${mot.map(m=>`<div class="row"><span>${esc(m.nome)} ${m.ativo?'':'<span class="m">(inativo)</span>'}</span><span><button class="sm" data-t="${m.id}">${m.ativo?'Inativar':'Ativar'}</button> <button class="sm del" data-dm="${m.id}">Excluir</button></span></div>`).join('')||'<p class="m">Nenhum motivo.</p>'}</div>`;
+ else b+=`<div class="card"><h2>Trocar senhas</h2>${['1','2','3','admin'].map(p=>`<div class="row"><span>${ICO[p]} ${NOME[p]}</span><span class="flt" style="margin:0"><input type="password" id="n${p}" placeholder="Nova senha" style="width:140px"><button class="sm xl" data-s="${p}">Salvar</button></span></div>`).join('')}</div>`;
+ shell('🔒 ADMINISTRADOR',b);
+ $$('[data-v]').forEach(x=>x.onclick=()=>{aview=x.dataset.v;adV()});
+ if(aview==='rel'){[['fd','de'],['fa','ate']].forEach(([i,k])=>$('#'+i).onchange=e=>{F[k]=e.target.value;buscar().catch(x=>toast(x.message,1))});$('#ft').onchange=e=>{F.t=e.target.value;adV()};$('#fm').onchange=e=>{F.m=e.target.value;adV()};$('#xl').onclick=excel;
+  $$('[data-del]').forEach(x=>x.onclick=()=>ac(()=>rpc('excluir_perda',{...AD(),p_id:x.dataset.del}),'Excluir este lançamento?',buscar))}
+ if(aview==='mot'){$('#am').onclick=()=>{const n=$('#nm').value.trim();n&&ac(()=>rpc('salvar_motivo',{...AD(),p_nome:n}),0,recar)};
+  $$('[data-t]').forEach(x=>x.onclick=()=>ac(()=>rpc('alternar_motivo',{...AD(),p_id:x.dataset.t}),0,recar));
+  $$('[data-dm]').forEach(x=>x.onclick=()=>ac(()=>rpc('excluir_motivo',{...AD(),p_id:x.dataset.dm}),'Excluir motivo? Lançamentos antigos continuam no histórico.',recar))}
+ if(aview==='sen')$$('[data-s]').forEach(x=>x.onclick=()=>{const v=$('#n'+x.dataset.s).value;ac(async()=>{await rpc('trocar_senha',{...AD(),p_perfil_alvo:x.dataset.s,p_nova:v});if(x.dataset.s==='admin')S.senha=v;toast('Senha alterada ✔')},0,adV)})}
+async function recar(){mot=await rpc('listar_motivos',A());adV()}
+async function ac(f,conf,then){if(conf&&!confirm(conf))return;try{await f();await then()}catch(e){toast(e.message,1)}}
+function excel(){const r=fil();if(!r.length)return toast('Nada para exportar',1);const wb=XLSX.utils.book_new(),ad=(n,a)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a),n);
+ ad('Lançamentos',[['Dia (referência)','Turno','Data/hora real','Motivo','Kg','Responsável'],...r.slice().reverse().map(x=>[br(x.dia),x.turno,new Date(x.criado_em).toLocaleString('pt-BR'),x.motivo,+x.kg,x.responsavel])]);
+ const g={};r.forEach(x=>{(g[x.dia]=g[x.dia]||[0,0,0])[x.turno-1]+=+x.kg});
+ ad('Por dia e turno (kg)',[['Dia','1º turno','2º turno','3º turno','Total','Limite '+LIM+' kg'],...Object.keys(g).sort().map(d=>[br(d),...g[d],g[d][0]+g[d][1]+g[d][2],g[d].some(v=>v>LIM)?'ACIMA em algum turno':'OK'])]);
+ const h={};r.forEach(x=>h[x.motivo]=(h[x.motivo]||0)+ +x.kg);ad('Por motivo',[['Motivo','Kg'],...Object.entries(h).sort((a,b)=>b[1]-a[1])]);
+ XLSX.writeFile(wb,`perdas_${F.de}_a_${F.ate}.xlsx`)}
+// ---------- INÍCIO ----------
+try{S=JSON.parse(sessionStorage.getItem('s'))}catch(e){}
+if(SUPABASE_URL.includes('SEU-PROJETO')||SUPABASE_ANON_KEY==='SUA-ANON-KEY')$('#app').innerHTML='<div class="login"><div class="logo">⚠️ Falta configurar</div><p>Abra o <b>index.html</b> e preencha <b>SUPABASE_URL</b> e <b>SUPABASE_ANON_KEY</b> no começo do arquivo.</p></div>';else S?boot():login();
+</script></body></html>
